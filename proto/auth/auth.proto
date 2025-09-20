@@ -1,0 +1,39 @@
+syntax ="proto3";
+
+package auth;
+
+option go_package = "github.com/irvandMR/go-grpc-ecommerce-BE/pb/auth";
+
+import "common/base_response.proto";
+import "buf/validate/validate.proto";
+
+service AuthService {
+//   rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+}
+
+
+
+// Request and Response for Login
+// message LoginRequest {
+//   string email = 1;
+//   string password = 2;
+// }
+
+// message LoginResponse {
+//   string token = 1;
+//   common.BaseResponse base_response = 2;
+// }
+
+
+// Request and Response for Register
+message RegisterRequest {
+  string full_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+  string email = 2 [(buf.validate.field).string = {min_len: 1, max_len: 255, email: true}];
+  string password = 3 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+  string password_confirmation = 4 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+}
+
+message RegisterResponse {
+  common.BaseResponse base = 1;
+}

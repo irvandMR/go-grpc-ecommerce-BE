@@ -13,7 +13,7 @@ type authHandler struct {
 	authService service.IAuthService
 }
 
-func (au *authHandler) Register(ctx context.Context, req *auth.RegisterRequest) (res *auth.RegisterResponse, err error) {
+func (au *authHandler) Register(ctx context.Context, req *auth.RegisterRequest) (*auth.RegisterResponse, error) {
 		errRes, err := utils.CheckValidtion(req)
 		if err != nil {
 			return nil, err
@@ -25,6 +25,24 @@ func (au *authHandler) Register(ctx context.Context, req *auth.RegisterRequest) 
 		}
 		// Process Register logic here
 		res, errAuth := au.authService.Register(ctx, req)
+		if errAuth != nil {
+			return nil, errAuth
+		}
+		return res, nil
+}
+
+func (au *authHandler) Login(ctx context.Context,req *auth.LoginRequest) (*auth.LoginResponse, error) {
+		errRes, err := utils.CheckValidtion(req)
+		if err != nil {
+			return nil, err
+		}
+		if errRes != nil {
+			return &auth.LoginResponse{
+				Base: utils.ErrorResponse(errRes),
+			}, nil
+		}
+		// Process Register logic here
+		res, errAuth := au.authService.Login(ctx, req)
 		if errAuth != nil {
 			return nil, errAuth
 		}

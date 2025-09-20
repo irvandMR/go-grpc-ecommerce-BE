@@ -8,22 +8,22 @@ import "common/base_response.proto";
 import "buf/validate/validate.proto";
 
 service AuthService {
-//   rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
 }
 
 
 
 // Request and Response for Login
-// message LoginRequest {
-//   string email = 1;
-//   string password = 2;
-// }
+message LoginRequest {
+  string email = 1 [(buf.validate.field).string = {min_len: 1, max_len: 255, email: true}];
+  string password = 2 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+}
 
-// message LoginResponse {
-//   string token = 1;
-//   common.BaseResponse base_response = 2;
-// }
+message LoginResponse {
+    common.BaseResponse base = 1;
+  string token = 2;
+}
 
 
 // Request and Response for Register

@@ -48,6 +48,41 @@ func (au *authHandler) Login(ctx context.Context,req *auth.LoginRequest) (*auth.
 		}
 		return res, nil
 }
+func (au *authHandler) Logout(ctx context.Context,req *auth.LogoutRequest) (*auth.LogoutResponse, error) {
+		errRes, err := utils.CheckValidtion(req)
+		if err != nil {
+			return nil, err
+		}
+		if errRes != nil {
+			return &auth.LogoutResponse{
+				Base: utils.ErrorResponse(errRes),
+			}, nil
+		}
+		// Process Register logic here
+		res, errAuth := au.authService.Logout(ctx, req)
+		if errAuth != nil {
+			return nil, errAuth
+		}
+		return res, nil
+}
+
+func (au *authHandler) ChangePassword(ctx context.Context,req *auth.ChangePasswordRequest) (*auth.ChangePasswordResponse, error) {
+	errRes, err := utils.CheckValidtion(req)
+		if err != nil {
+			return nil, err
+		}
+		if errRes != nil {
+			return &auth.ChangePasswordResponse{
+				Base: utils.ErrorResponse(errRes),
+			}, nil
+		}
+
+		res, err := au.authService.ChangePassword(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	return res, nil
+}
 
 
 

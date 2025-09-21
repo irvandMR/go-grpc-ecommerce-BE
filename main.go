@@ -5,16 +5,19 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/handler"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/repository"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/service"
+	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/grpcmiddleware"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/pb/auth"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/pkg/database"
-	"github.com/irvandMR/go-grpc-ecommerce-BE/pkg/grpcmiddleware"
 	"github.com/joho/godotenv"
+	gocache "github.com/patrickmn/go-cache"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
 )
 
 
@@ -29,13 +32,18 @@ func main() {
 	}
 	db := database.ConnectDB(ctx, os.Getenv("DB_URI"))
 
+	// Cache
+	cacheService := gocache.New(time.Hour*24, time.Hour)
+
+	authMiddleware :=  grpcmiddleware.NewAuthMiddleware(cacheService)
+
 	// Auth
 	authRepo := repository.NewAuthRepository(db)
-	authService := service.NewAuthService(authRepo)
+	authService := service.NewAuthService(authRepo, cacheService)
 	authHandler := handler.NewAuthHandler(authService)
 
 	grpcServer := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(grpcmiddleware.ErrorMiddleware),
+		grpc.ChainUnaryInterceptor(grpcmiddleware.ErrorMiddleware, authMiddleware.Middleware),
 	)
 
 	// Register your gRPC services here

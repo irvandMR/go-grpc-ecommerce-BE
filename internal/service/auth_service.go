@@ -9,9 +9,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/entity"
+	jwtEntity "github.com/irvandMR/go-grpc-ecommerce-BE/internal/entity/jwt"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/repository"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/internal/utils"
 	"github.com/irvandMR/go-grpc-ecommerce-BE/pb/auth"
+	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,9 +22,63 @@ import (
 type IAuthService interface {
 	Register(ctx context.Context, req *auth.RegisterRequest) (res *auth.RegisterResponse, err error)
 	Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error)
+	Logout(ctx context.Context,req *auth.LogoutRequest) (*auth.LogoutResponse, error)
+	ChangePassword(ctx context.Context,req *auth.ChangePasswordRequest) (*auth.ChangePasswordResponse, error)
 }
 type authService struct{
 	authRepo repository.IAuthRepository
+	cacheService *gocache.Cache
+}
+
+// ChagePassword implements the IAuthService interface.
+func (au *authService) ChangePassword(ctx context.Context, req *auth.ChangePasswordRequest) (*auth.ChangePasswordResponse, error) {
+	// check new password and confirm new password
+	if req.NewPassword != req.NewPasswordConfirmation{
+		return &auth.ChangePasswordResponse{
+			Base: utils.BadRequestResponse("password and confirm password not match"),
+		}, nil
+	}
+	// check current password with db
+	jwtTkn, err := jwtEntity.ParseTokenFromContext(ctx)
+	if err != nil{
+		return nil, err
+	}
+	claims, err := jwtEntity.GetClaimsFromToken(jwtTkn)
+	if err != nil{
+		return nil, err
+	}
+	user, err := au.authRepo.GetUserByEmail(ctx, claims.Email)
+	if err != nil{
+		return nil, err
+	}
+	if user == nil{
+		return &auth.ChangePasswordResponse{
+			Base: utils.BadRequestResponse("email not registered"),
+		}, nil
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword))
+	if err != nil{
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword){
+			return &auth.ChangePasswordResponse{
+				Base: utils.BadRequestResponse("current password not match"),
+			}, nil
+		}
+		return nil, err
+	}
+
+	// if match, update to new password
+	hashPassword , err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 10)
+	if err != nil{
+		return nil, err
+	}
+	err = au.authRepo.UpdatedUserPassword(ctx, user.Id, string(hashPassword), user.Fullname)
+	if err != nil{
+		return nil, err
+	}
+
+	return &auth.ChangePasswordResponse{
+		Base: utils.SuccessResponse("Password changed successfully (not implemented)"),
+	}, nil
 }
 
 // Login implements the IAuthService interface.
@@ -48,7 +104,7 @@ func (au *authService) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 		return nil, err
 	}
 	// if match, generate token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, entity.JWTClaim{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtEntity.JWTClaim{
 		Email: user.Email,
 		Fullname: user.Fullname,
 		Role: user.RoleCode,
@@ -119,8 +175,30 @@ func (au *authService) Register(ctx context.Context, req *auth.RegisterRequest) 
 
 
 
-func NewAuthService(authRepo repository.IAuthRepository) IAuthService {
+func (au *authService) Logout(ctx context.Context, req *auth.LogoutRequest) (*auth.LogoutResponse, error) {
+	// get token from meta data
+	jwtToken , err := jwtEntity.ParseTokenFromContext(ctx)
+	if err != nil{
+		return  nil, err
+	}
+
+	// returm token  to entity jwt
+	claims, err := jwtEntity.GetClaimsFromToken(jwtToken)
+	if err != nil{
+		return nil, err
+	}
+
+	// instert token to cache
+	au.cacheService.Set(jwtToken, "", time.Duration(claims.ExpiresAt.Time.Unix() - time.Now().Unix())*time.Second)
+
+	return &auth.LogoutResponse{
+		Base: utils.SuccessResponse("Success Logout"),
+	}, nil
+}
+
+func NewAuthService(authRepo repository.IAuthRepository, cacheService *gocache.Cache) IAuthService {
 	return &authService{
 		authRepo: authRepo,
+		cacheService: cacheService,
 	}
 }

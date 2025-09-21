@@ -22,6 +22,12 @@ func ErrorMiddleware(ctx context.Context, req any, info *grpc.UnaryServerInfo, h
 	res, err := handler(ctx, req)
 	if err != nil {
 		log.Println(err)
+		statusErr, ok := status.FromError(err)
+		if ok {
+			if statusErr.Code() == codes.Unauthenticated {
+				return nil, err
+			}
+		}
 		return nil, status.Errorf(codes.Internal, "internal server error")
 	}
 	return res, err

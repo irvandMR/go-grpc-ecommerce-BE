@@ -10,6 +10,8 @@ import "buf/validate/validate.proto";
 service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
 }
 
 
@@ -35,5 +37,23 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
+  common.BaseResponse base = 1;
+}
+
+// Request and Response for Logout
+message LogoutRequest {
+}
+
+message LogoutResponse {
+  common.BaseResponse base = 1;
+}
+
+// Request and Response for Change Password
+message ChangePasswordRequest {
+  string current_password = 1 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+  string new_password = 2 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+  string new_password_confirmation = 3 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+}
+message ChangePasswordResponse {
   common.BaseResponse base = 1;
 }

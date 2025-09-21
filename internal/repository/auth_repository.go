@@ -11,6 +11,7 @@ import (
 type IAuthRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	InsertUser(ctx context.Context, user *entity.User) error
+	UpdatedUserPassword(ctx context.Context, userId string, hashNewPassword string, updatedBy string) error
 }
 
 type authRepository struct{
@@ -65,6 +66,18 @@ func (ar *authRepository) InsertUser(ctx context.Context, user *entity.User) err
 }
 
 
+
+func (ar *authRepository) UpdatedUserPassword(ctx context.Context, userId string, hashNewPassword string, updatedBy string) error {
+	_, err := ar.db.ExecContext(ctx, "UPDATE \"user\" SET password = $1, updated_by = $2, updated_at = NOW() WHERE id = $3 AND is_deleted IS false",
+		hashNewPassword,
+		updatedBy,
+		userId,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func NewAuthRepository(db *sql.DB) IAuthRepository {
 	return &authRepository{

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type IAuthService interface {
@@ -24,6 +26,7 @@ type IAuthService interface {
 	Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error)
 	Logout(ctx context.Context,req *auth.LogoutRequest) (*auth.LogoutResponse, error)
 	ChangePassword(ctx context.Context,req *auth.ChangePasswordRequest) (*auth.ChangePasswordResponse, error)
+	GetProfile(ctx context.Context,req *auth.GetProfileRequest) (*auth.GetProfileResponse, error)
 }
 type authService struct{
 	authRepo repository.IAuthRepository
@@ -183,9 +186,9 @@ func (au *authService) Logout(ctx context.Context, req *auth.LogoutRequest) (*au
 	}
 
 	// returm token  to entity jwt
-	claims, err := jwtEntity.GetClaimsFromToken(jwtToken)
+	claims, err := jwtEntity.GetClaimsFromContext(ctx)
 	if err != nil{
-		return nil, err
+		return nil,err
 	}
 
 	// instert token to cache
@@ -195,6 +198,39 @@ func (au *authService) Logout(ctx context.Context, req *auth.LogoutRequest) (*au
 		Base: utils.SuccessResponse("Success Logout"),
 	}, nil
 }
+
+func (au *authService) GetProfile(ctx context.Context, req *auth.GetProfileRequest) (*auth.GetProfileResponse, error) {
+	// Get data token
+	claims, err := jwtEntity.GetClaimsFromContext(ctx)
+	if err != nil{
+		return nil,err
+	}
+	
+	
+	// get data from db
+	profile, err := au.authRepo.GetUserByEmail(ctx, claims.Email)
+	if err != nil{
+		return nil, err
+	}
+	if profile == nil{
+		return &auth.GetProfileResponse{
+			Base: utils.BadRequestResponse("email not registered"),
+		
+		}, nil
+	}
+
+	log.Println("claim", claims)
+
+	return  &auth.GetProfileResponse{
+		Base: utils.SuccessResponse("Success Get Profile"),
+			Id:claims.Issuer,
+			Email: claims.Email,
+			FullName: claims.Fullname,
+			RoleCode: claims.Role,
+			MemberSince: timestamppb.New(profile.CreatedAt),
+	},nil
+}
+
 
 func NewAuthService(authRepo repository.IAuthRepository, cacheService *gocache.Cache) IAuthService {
 	return &authService{
